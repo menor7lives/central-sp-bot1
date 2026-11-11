@@ -186,6 +186,7 @@ class BuildModeView(discord.ui.View):
             return False
         return True
 
+
     @discord.ui.button(
         label="Manter e adicionar",
         style=discord.ButtonStyle.success,
@@ -199,7 +200,10 @@ class BuildModeView(discord.ui.View):
                 ephemeral=True
             )
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.edit_message(
+            content="🚀 Construção autorizada! Iniciando...",
+            view=None
+        )
 
         await run_build(
             interaction,
@@ -207,6 +211,7 @@ class BuildModeView(discord.ui.View):
             spec=self.spec,
             reset=False
         )
+
 
     @discord.ui.button(
         label="Substituir estrutura",
@@ -515,12 +520,6 @@ async def ajuda(interaction: discord.Interaction):
             "Mencione o Slayer Bot e descreva o servidor "
             "que deseja construir."
         ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🏗️ Criar servidor",
-        value="`/criar` — cria uma estrutura profissional.",
         inline=False
     )
 
@@ -856,11 +855,12 @@ async def handle_mention(message: discord.Message):
                     "Tente: `@bot crie um servidor de futebol`"
                 )
 
+
             await message.reply(
                 "⚔️ **Pedido entendido!**\n\n"
                 "Como deseja construir seu servidor?\n\n"
-                "➕ Manter e adicionar: preserva a estrutura atual.\n"
-                "🧹 Substituir estrutura: remove os itens "
+                "➕ **Manter e adicionar:** preserva a estrutura atual.\n"
+                "🧹 **Substituir estrutura:** remove os itens "
                 "que o bot puder gerenciar, após confirmação dupla.",
                 view=BuildModeView(
                     message.author.id,
@@ -869,11 +869,6 @@ async def handle_mention(message: discord.Message):
                 )
             )
 
-            await run_build(
-                message,
-                template_key if get_template(template_key) else None,
-                spec=spec
-            )
 
         else:
 
