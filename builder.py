@@ -389,12 +389,10 @@ async def build_guild_structure(
                 guild
             )
 
-            if channel_type == "voice":
-                channel = discord.utils.get(
-                    guild.voice_channels,
-                    name=name
-                )
-
+            channel = discord.utils.get(
+    category.voice_channels,
+    name=name
+)
                 if channel is None:
                     user_limit = channel_data.get("user_limit")
 
@@ -424,10 +422,10 @@ async def build_guild_structure(
                     )
 
             else:
-                channel = discord.utils.get(
-                    guild.text_channels,
-                    name=name
-                )
+channel = discord.utils.get(
+    category.text_channels,
+    name=name
+)
 
                 if channel is None:
                     await guild.create_text_channel(
