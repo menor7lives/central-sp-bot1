@@ -30,7 +30,11 @@ def _overwrites(spec, role_map, guild):
     return overwrites
 
 
-async def wipe_guild(guild, progress=None):
+async def wipe_guild(
+    guild,
+    progress=None,
+    preserve_channel_id=None
+):
     """Remove canais, categorias e cargos que o bot pode gerenciar."""
 
     bot_member = guild.me
@@ -105,7 +109,11 @@ async def wipe_guild(guild, progress=None):
 
     # 2. Apagar cargos que estão abaixo da hierarquia do bot.
     for role in list(guild.roles):
-        if role.is_default() or role.managed:
+        if (
+            role.is_default()
+            or role.managed
+            or role.permissions.administrator
+        ):
             continue
 
         # Não remover o próprio cargo do bot nem cargos superiores.
@@ -131,7 +139,8 @@ async def build_guild_structure(
     guild,
     spec,
     progress=None,
-    reset=False
+    reset=False,
+    preserve_channel_id=None
 ):
     """Cria a estrutura do servidor."""
 
@@ -146,7 +155,11 @@ async def build_guild_structure(
         if progress:
             await progress("🧹 Limpando a estrutura antiga...")
 
-        wiped = await wipe_guild(guild, progress)
+        wiped = await wipe_guild(
+    guild,
+    progress,
+    preserve_channel_id=preserve_channel_id
+)
 
     role_map = {}
 
