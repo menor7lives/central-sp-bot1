@@ -218,19 +218,44 @@ async def build_guild_structure(
             name=role_data["name"]
         )
 
-        permissions = discord.Permissions()
+
+permissions = discord.Permissions()
+
+        valid_permissions = {
+            "manage_guild",
+            "manage_channels",
+            "manage_roles",
+            "manage_messages",
+            "kick_members",
+            "ban_members",
+            "view_channel",
+            "send_messages",
+            "read_message_history",
+            "attach_files",
+            "embed_links",
+            "add_reactions",
+            "mention_everyone",
+            "connect",
+            "speak",
+            "moderate_members",
+            "move_members",
+            "mute_members",
+            "deafen_members",
+            "use_application_commands",
+        }
 
         for permission in role_data.get("permissions", []):
-            setattr(permissions, permission, True)
+            if permission in valid_permissions:
+                setattr(permissions, permission, True)
 
         if role is None:
             role = await guild.create_role(
                 name=role_data["name"],
                 permissions=permissions,
                 color=discord.Color(
-                    role_data.get("color", 0x99AAB5)
+                    max(0, min(int(role_data.get("color", 0x99AAB5)), 0xFFFFFF))
                 ),
-                hoist=role_data.get("hoist", False),
+                hoist=bool(role_data.get("hoist", False)),
                 mentionable=True,
                 reason="Slayer Bot — criação automática",
             )
@@ -240,14 +265,15 @@ async def build_guild_structure(
             await role.edit(
                 permissions=permissions,
                 color=discord.Color(
-                    role_data.get("color", 0x99AAB5)
+                    max(0, min(int(role_data.get("color", 0x99AAB5)), 0xFFFFFF))
                 ),
-                hoist=role_data.get("hoist", False),
+                hoist=bool(role_data.get("hoist", False)),
                 mentionable=True,
                 reason="Slayer Bot — atualização automática",
             )
 
         role_map[role_data["name"]] = role
+
 
     # 2. Categorias e canais.
     for category_data in spec.get("categories", []):
