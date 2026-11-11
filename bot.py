@@ -42,90 +42,182 @@ def can_build(member: discord.Member) -> bool:
 # CONSTRUÇÃO DE SERVIDORES
 # ============================================================
 
-async def run_build(
-    interaction_or_msg,
-    template_key=None,
-    spec=None,
-    guild=None
-):
-    """Cria a estrutura do servidor sem apagar os canais existentes."""
 
-    is_interaction = isinstance(
-        interaction_or_msg,
-        discord.Interaction
+class FinalResetConfirmation(discord.ui.View):
+
+    def __init__(self, user_id, spec, template_key=None):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.spec = spec
+        self.template_key = template_key
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "❌ Somente quem iniciou a operação pode confirmar.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="SIM, SUBSTITUIR TUDO",
+        style=discord.ButtonStyle.danger,
+        emoji="🧹"
+    )
+    async def confirm_reset(self, interaction, button):
+
+        if not can_build(interaction.user):
+            return await interaction.response.send_message(
+                "❌ Você não tem autorização.",
+                ephemeral=True
+            )
+
+        await interaction.response.edit_message(
+            content="🧹 Reconstrução autorizada. Iniciando...",
+            view=None
+        )
+
+        await run_build(
+            interaction,
+            template_key=self.template_key,
+            spec=self.spec,
+            reset=True
+        )
+
+    @discord.ui.button(
+        label="Cancelar",
+        style=discord.ButtonStyle.secondary,
+        emoji="✖️"
+    )
+    async def cancel(self, interaction, button):
+        await interaction.response.edit_message(
+            content="❌ Reconstrução cancelada. Nada foi apagado.",
+            view=None
+        )
+
+
+class BuildModeView(discord.ui.View):
+
+    def __init__(self, user_id, spec, template_key=None):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.spec = spec
+        self.template_key = template_key
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "❌ Somente quem solicitou a construção pode escolher.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="Manter e adicionar",
+        style=discord.ButtonStyle.success,
+        emoji="➕"
+    )
+    async def keep(self, interaction, button):
+
+        if not can_build(interaction.user):
+            return await interaction.response.send_message(
+                "❌ Você não tem autorização.",
+                ephemeral=True
+            )
+
+        await interaction.response.defer(ephemeral=True)
+
+        await run_build(
+            interaction,
+            template_key=self.template_key,
+            spec=self.spec,
+            reset=False
+        )
+
+    @discord.ui.button(
+        label="Substituir estrutura",
+        style=discord.ButtonStyle.danger,
+        emoji="🧹"
+    )
+    async def replace(self, interaction, button):
+
+        if not can_build(interaction.user):
+            return await interaction.response.send_message(
+                "❌ Você não tem autorização.",
+                ephemeral=True
+            )
+
+        embed = discord.Embed(
+            title="⚠️ ATENÇÃO — RECONSTRUÇÃO",
+            description=(
+                "Você está prestes a substituir a estrutura atual.\n\n"
+                "Serão removidos os canais, categorias e cargos "
+                "que o Slayer Bot tiver permissão para gerenciar.\n\n"
+                "**Essa operação não pode ser desfeita automaticamente.**\n\n"
+                "Cargos protegidos, @everyone e cargos de integrações "
+                "serão preservados."
+            ),
+            color=discord.Color.red()
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            view=FinalResetConfirmation(
+                self.user_id,
+                self.spec,
+                self.template_key
+            ),
+            ephemeral=True
+        )
+
+
+class Dashboard(discord.ui.View):
+
+    def __init__(self, user_id):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+
+
+def dashboard_embed(guild):
+
+    embed = discord.Embed(
+        title="⚔️ Slayer Bot — Construtor Inteligente",
+        description=(
+            "Descreva o servidor que deseja construir mencionando "
+            "o Slayer Bot.\n\n"
+            "**Exemplo:**\n"
+            "`@Slayer Bot crie um servidor profissional de futebol`\n\n"
+            "Depois você poderá escolher:\n"
+            "➕ Manter a estrutura existente.\n"
+            "🧹 Substituir a estrutura existente.\n\n"
+            "A substituição exige uma segunda confirmação."
+        ),
+        color=0x5865F2
     )
 
-    if guild is None:
-        guild = interaction_or_msg.guild
+    if bot.user:
+        embed.set_thumbnail(url=bot.user.display_avatar.url)
 
-    if guild is None:
-        return
-
-    origin = interaction_or_msg.channel
-
-    requester = (
-        interaction_or_msg.user
-        if is_interaction
-        else interaction_or_msg.author
+    embed.add_field(
+        name="🌐 Gerador de sites",
+        value=f"{len(sitegen.TIPOS)} tipos disponíveis.",
+        inline=False
     )
 
-    if spec is None:
-        spec = get_template(template_key or "comunidade")
+    embed.add_field(
+        name="🏠 Servidor atual",
+        value=guild.name,
+        inline=False
+    )
 
-    if spec is None:
-        return await origin.send(
-            "❌ Não consegui encontrar esse modelo de servidor."
-        )
+    embed.set_footer(
+        text="Slayer Bot Premium • Construtor inteligente"
+    )
 
-    try:
-        await origin.send(
-            "⚔️ **Slayer Bot iniciou a construção!**\n"
-            "Estou organizando os canais, categorias e cargos. "
-            "Os itens existentes serão preservados."
-        )
+    return embed
 
-        async def progress(text):
-            try:
-                await origin.send(text)
-            except discord.HTTPException:
-                pass
-
-        created = await builder.build_guild_structure(
-            guild,
-            spec,
-            progress=progress
-        )
-
-        summary = builder.summary_embed(
-            spec,
-            created,
-            TEMPLATES.get(
-                template_key or "",
-                {}
-            ).get("label"),
-            {"channels": 0, "roles": 0}
-        )
-
-        await origin.send(
-            f"✅ <@{requester.id}>! "
-            "**A estrutura do servidor foi criada com sucesso!**",
-            embed=summary
-        )
-
-    except discord.Forbidden:
-        await origin.send(
-            "❌ **Não tenho permissões suficientes!**\n\n"
-            "Verifique se meu cargo possui as permissões necessárias "
-            "e se está acima dos cargos que preciso organizar."
-        )
-
-    except Exception as e:
-        print(f"[ERRO AO CONSTRUIR SERVIDOR] {e}")
-
-        await origin.send(
-            "❌ Ocorreu um erro durante a construção.\n"
-            "Confira o console para ver os detalhes."
-        )
 
 
 # ============================================================
