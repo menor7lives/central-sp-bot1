@@ -1,43 +1,79 @@
 
 """Slayer Bot — construção e reconstrução de servidores."""
+
 import discord
+
+
+# Permissões permitidas para cargos.
+VALID_ROLE_PERMISSIONS = {
+    "manage_guild",
+    "manage_channels",
+    "manage_roles",
+    "manage_messages",
+    "kick_members",
+    "ban_members",
+    "view_channel",
+    "send_messages",
+    "read_message_history",
+    "attach_files",
+    "embed_links",
+    "add_reactions",
+    "mention_everyone",
+    "connect",
+    "speak",
+    "moderate_members",
+    "move_members",
+    "mute_members",
+    "deafen_members",
+    "use_application_commands",
+}
+
+# Permissões permitidas nas configurações de canais.
+VALID_CHANNEL_PERMISSIONS = {
+    "view_channel",
+    "send_messages",
+    "read_message_history",
+    "attach_files",
+    "embed_links",
+    "add_reactions",
+    "mention_everyone",
+    "manage_messages",
+    "manage_channels",
+    "manage_roles",
+    "connect",
+    "speak",
+    "stream",
+    "use_voice_activation",
+    "move_members",
+    "mute_members",
+    "deafen_members",
+    "priority_speaker",
+    "create_instant_invite",
+    "send_tts_messages",
+    "use_external_emojis",
+    "use_external_stickers",
+    "use_application_commands",
+}
+
+
+def _safe_color(value):
+    try:
+        color = int(value)
+    except (TypeError, ValueError):
+        color = 0x99AAB5
+
+    return discord.Color(max(0, min(color, 0xFFFFFF)))
 
 
 def _target(name, role_map, guild):
     if name == "@everyone":
         return guild.default_role
-    return role_map.get(name)
 
+    return role_map.get(name)
 
 
 def _overwrites(spec, role_map, guild):
     overwrites = {}
-
-    valid_permissions = {
-        "view_channel",
-        "send_messages",
-        "read_message_history",
-        "attach_files",
-        "embed_links",
-        "add_reactions",
-        "mention_everyone",
-        "manage_messages",
-        "manage_channels",
-        "manage_roles",
-        "connect",
-        "speak",
-        "stream",
-        "use_voice_activation",
-        "move_members",
-        "mute_members",
-        "deafen_members",
-        "priority_speaker",
-        "create_instant_invite",
-        "send_tts_messages",
-        "use_external_emojis",
-        "use_external_stickers",
-        "use_application_commands",
-    }
 
     if not isinstance(spec, dict):
         return overwrites
@@ -50,18 +86,26 @@ def _overwrites(spec, role_map, guild):
 
         overwrite = discord.PermissionOverwrite()
 
-        for permission in rules.get("allow", []):
-            if permission in valid_permissions:
+        allowed = rules.get("allow", [])
+        denied = rules.get("deny", [])
+
+        if not isinstance(allowed, list):
+            allowed = []
+
+        if not isinstance(denied, list):
+            denied = []
+
+        for permission in allowed:
+            if permission in VALID_CHANNEL_PERMISSIONS:
                 setattr(overwrite, permission, True)
 
-        for permission in rules.get("deny", []):
-            if permission in valid_permissions:
+        for permission in denied:
+            if permission in VALID_CHANNEL_PERMISSIONS:
                 setattr(overwrite, permission, False)
 
         overwrites[target] = overwrite
 
     return overwrites
-
 
 
 async def wipe_guild(
@@ -74,16 +118,18 @@ async def wipe_guild(
     bot_member = guild.me
 
     if bot_member is None:
-        raise RuntimeError("Não consegui identificar o membro do bot.")
+        raise RuntimeError(
+            "Não consegui identificar o membro do bot."
+        )
 
-    permissions = bot_member.guild_permissions
+    bot_permissions = bot_member.guild_permissions
 
-    if not permissions.manage_channels:
+    if not bot_permissions.manage_channels:
         raise RuntimeError(
             "O bot precisa da permissão Gerenciar Canais."
         )
 
-    if not permissions.manage_roles:
+    if not bot_permissions.manage_roles:
         raise RuntimeError(
             "O bot precisa da permissão Gerenciar Cargos."
         )
@@ -97,23 +143,16 @@ async def wipe_guild(
         "failed": 0,
     }
 
-    # 1. Apagar canais antes das categorias.
-    channels = [
-        *guild.text_channels,
-        *guild.voice_channels,
-        *guild.stage_channels,
-        *guild.forum_channels,
-        *guild.categories,
-    ]
+    channels = list(guild.channels)
 
-    # Categorias ficam por último.
+    # Categorias são apagadas por último.
     channels.sort(
         key=lambda channel: isinstance(
             channel, discord.CategoryChannel
         )
     )
 
-    # Preservar o canal onde o comando foi executado.
+    # Preserva o canal onde o comando foi executado.
     if preserve_channel_id is not None:
         channels = [
             channel
@@ -138,8 +177,12 @@ async def wipe_guild(
             else:
                 wiped["channels"] += 1
 
-        except (discord.Forbidden, discord.HTTPException) as error:
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
             wiped["failed"] += 1
+
             print(
                 f"[RESET] Erro ao apagar {channel.name}: {error}"
             )
@@ -149,7 +192,7 @@ async def wipe_guild(
                 f"🧹 Limpando servidor: {index}/{total} canais..."
             )
 
-    # 2. Apagar cargos que estão abaixo da hierarquia do bot.
+    # Remove somente cargos que o bot pode gerenciar.
     for role in list(guild.roles):
         if (
             role.is_default()
@@ -158,7 +201,6 @@ async def wipe_guild(
         ):
             continue
 
-        # Não remover o próprio cargo do bot nem cargos superiores.
         if role >= bot_top_role:
             continue
 
@@ -166,10 +208,15 @@ async def wipe_guild(
             await role.delete(
                 reason="Slayer Bot — reconstrução autorizada"
             )
+
             wiped["roles"] += 1
 
-        except (discord.Forbidden, discord.HTTPException) as error:
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
             wiped["failed"] += 1
+
             print(
                 f"[RESET] Erro ao apagar cargo {role.name}: {error}"
             )
@@ -184,7 +231,12 @@ async def build_guild_structure(
     reset=False,
     preserve_channel_id=None
 ):
-    """Cria a estrutura do servidor."""
+    """Cria cargos, categorias e canais no servidor."""
+
+    if not isinstance(spec, dict):
+        raise ValueError(
+            "A estrutura recebida pela IA é inválida."
+        )
 
     wiped = {
         "channels": 0,
@@ -195,7 +247,9 @@ async def build_guild_structure(
 
     if reset:
         if progress:
-            await progress("🧹 Limpando a estrutura antiga...")
+            await progress(
+                "🧹 Limpando a estrutura antiga..."
+            )
 
         wiped = await wipe_guild(
             guild,
@@ -211,72 +265,83 @@ async def build_guild_structure(
         "channels": 0,
     }
 
-    # 1. Criação dos cargos.
-    for role_data in spec.get("roles", []):
+    roles_data = spec.get("roles", [])
+    categories_data = spec.get("categories", [])
+
+    if not isinstance(roles_data, list):
+        roles_data = []
+
+    if not isinstance(categories_data, list):
+        categories_data = []
+
+    # 1. Criação e configuração dos cargos.
+    for role_data in roles_data:
+        if not isinstance(role_data, dict):
+            continue
+
+        role_name = role_data.get("name")
+
+        if not isinstance(role_name, str) or not role_name.strip():
+            continue
+
         role = discord.utils.get(
             guild.roles,
-            name=role_data["name"]
+            name=role_name
         )
 
+        permissions = discord.Permissions()
 
-permissions = discord.Permissions()
+        role_permissions = role_data.get("permissions", [])
 
-        valid_permissions = {
-            "manage_guild",
-            "manage_channels",
-            "manage_roles",
-            "manage_messages",
-            "kick_members",
-            "ban_members",
-            "view_channel",
-            "send_messages",
-            "read_message_history",
-            "attach_files",
-            "embed_links",
-            "add_reactions",
-            "mention_everyone",
-            "connect",
-            "speak",
-            "moderate_members",
-            "move_members",
-            "mute_members",
-            "deafen_members",
-            "use_application_commands",
-        }
+        if not isinstance(role_permissions, list):
+            role_permissions = []
 
-        for permission in role_data.get("permissions", []):
-            if permission in valid_permissions:
+        for permission in role_permissions:
+            if permission in VALID_ROLE_PERMISSIONS:
                 setattr(permissions, permission, True)
+
+        color = _safe_color(
+            role_data.get("color", 0x99AAB5)
+        )
+
+        hoist = bool(role_data.get("hoist", False))
 
         if role is None:
             role = await guild.create_role(
-                name=role_data["name"],
+                name=role_name,
                 permissions=permissions,
-                color=discord.Color(
-                    max(0, min(int(role_data.get("color", 0x99AAB5)), 0xFFFFFF))
-                ),
-                hoist=bool(role_data.get("hoist", False)),
+                color=color,
+                hoist=hoist,
                 mentionable=True,
                 reason="Slayer Bot — criação automática",
             )
+
             created["roles"] += 1
 
         elif not role.managed and role < guild.me.top_role:
             await role.edit(
                 permissions=permissions,
-                color=discord.Color(
-                    max(0, min(int(role_data.get("color", 0x99AAB5)), 0xFFFFFF))
-                ),
-                hoist=bool(role_data.get("hoist", False)),
+                color=color,
+                hoist=hoist,
                 mentionable=True,
                 reason="Slayer Bot — atualização automática",
             )
 
-        role_map[role_data["name"]] = role
+        role_map[role_name] = role
 
+    # 2. Criação das categorias e dos canais.
+    for category_data in categories_data:
+        if not isinstance(category_data, dict):
+            continue
 
-    # 2. Categorias e canais.
-    for category_data in spec.get("categories", []):
+        category_name = category_data.get("name")
+
+        if (
+            not isinstance(category_name, str)
+            or not category_name.strip()
+        ):
+            continue
+
         overwrites = _overwrites(
             category_data.get("overwrites"),
             role_map,
@@ -285,21 +350,37 @@ permissions = discord.Permissions()
 
         category = discord.utils.get(
             guild.categories,
-            name=category_data["name"]
+            name=category_name
         )
 
         if category is None:
             category = await guild.create_category(
-                category_data["name"],
+                category_name,
                 overwrites=overwrites,
                 reason="Slayer Bot — criação automática",
             )
-            created["categories"] += 1
-        else:
-            await category.edit(overwrites=overwrites)
 
-        for channel_data in category_data.get("channels", []):
-            name = channel_data["name"]
+            created["categories"] += 1
+
+        else:
+            await category.edit(
+                overwrites=overwrites
+            )
+
+        channels_data = category_data.get("channels", [])
+
+        if not isinstance(channels_data, list):
+            channels_data = []
+
+        for channel_data in channels_data:
+            if not isinstance(channel_data, dict):
+                continue
+
+            name = channel_data.get("name")
+
+            if not isinstance(name, str) or not name.strip():
+                continue
+
             channel_type = channel_data.get("type", "text")
 
             channel_overwrites = _overwrites(
@@ -315,14 +396,27 @@ permissions = discord.Permissions()
                 )
 
                 if channel is None:
+                    user_limit = channel_data.get("user_limit")
+
+                    if user_limit is not None:
+                        try:
+                            user_limit = max(
+                                0,
+                                min(int(user_limit), 99)
+                            )
+                        except (TypeError, ValueError):
+                            user_limit = None
+
                     await guild.create_voice_channel(
                         name,
                         category=category,
                         overwrites=channel_overwrites,
-                        user_limit=channel_data.get("user_limit"),
+                        user_limit=user_limit,
                         reason="Slayer Bot — criação automática",
                     )
+
                     created["channels"] += 1
+
                 else:
                     await channel.edit(
                         category=category,
@@ -342,7 +436,9 @@ permissions = discord.Permissions()
                         overwrites=channel_overwrites,
                         reason="Slayer Bot — criação automática",
                     )
+
                     created["channels"] += 1
+
                 else:
                     await channel.edit(
                         category=category,
@@ -351,14 +447,20 @@ permissions = discord.Permissions()
 
         if progress:
             await progress(
-                f"✅ Categoria **{category_data['name']}** configurada."
+                f"✅ Categoria **{category_name}** configurada."
             )
 
     created["wiped"] = wiped
+
     return created
 
 
-def summary_embed(spec, created, template_label=None, wiped=None):
+def summary_embed(
+    spec,
+    created,
+    template_label=None,
+    wiped=None
+):
     embed = discord.Embed(
         title="⚔️ Slayer Bot — Servidor configurado!",
         description=(
