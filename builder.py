@@ -9,25 +9,59 @@ def _target(name, role_map, guild):
     return role_map.get(name)
 
 
+
 def _overwrites(spec, role_map, guild):
     overwrites = {}
 
-    for name, rules in (spec or {}).items():
+    valid_permissions = {
+        "view_channel",
+        "send_messages",
+        "read_message_history",
+        "attach_files",
+        "embed_links",
+        "add_reactions",
+        "mention_everyone",
+        "manage_messages",
+        "manage_channels",
+        "manage_roles",
+        "connect",
+        "speak",
+        "stream",
+        "use_voice_activation",
+        "move_members",
+        "mute_members",
+        "deafen_members",
+        "priority_speaker",
+        "create_instant_invite",
+        "send_tts_messages",
+        "use_external_emojis",
+        "use_external_stickers",
+        "use_application_commands",
+    }
+
+    if not isinstance(spec, dict):
+        return overwrites
+
+    for name, rules in spec.items():
         target = _target(name, role_map, guild)
-        if target is None:
+
+        if target is None or not isinstance(rules, dict):
             continue
 
         overwrite = discord.PermissionOverwrite()
 
         for permission in rules.get("allow", []):
-            setattr(overwrite, permission, True)
+            if permission in valid_permissions:
+                setattr(overwrite, permission, True)
 
         for permission in rules.get("deny", []):
-            setattr(overwrite, permission, False)
+            if permission in valid_permissions:
+                setattr(overwrite, permission, False)
 
         overwrites[target] = overwrite
 
     return overwrites
+
 
 
 async def wipe_guild(
