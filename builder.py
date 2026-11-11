@@ -110,8 +110,7 @@ def _overwrites(spec, role_map, guild):
 
 async def wipe_guild(
     guild,
-    progress=None,
-    preserve_channel_id=None
+    progress=None
 ):
     """Remove canais, categorias e cargos que o bot pode gerenciar."""
 
@@ -151,14 +150,6 @@ async def wipe_guild(
             channel, discord.CategoryChannel
         )
     )
-
-    # Preserva o canal onde o comando foi executado.
-    if preserve_channel_id is not None:
-        channels = [
-            channel
-            for channel in channels
-            if channel.id != preserve_channel_id
-        ]
 
     total = len(channels)
 
@@ -251,11 +242,10 @@ async def build_guild_structure(
                 "🧹 Limpando a estrutura antiga..."
             )
 
-        wiped = await wipe_guild(
-            guild,
-            progress,
-            preserve_channel_id=preserve_channel_id
-        )
+        await wipe_guild(
+    guild,
+    progress=progress
+)
 
     role_map = {}
 
