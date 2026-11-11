@@ -28,6 +28,78 @@ bot = commands.Bot(
     help_command=None
 )
 
+async def run_build(
+    target,
+    template_key=None,
+    spec=None,
+    guild=None,
+    reset=False
+):
+    """Executa a construção ou reconstrução do servidor."""
+
+    if isinstance(target, discord.Interaction):
+        guild = guild or target.guild
+        channel = target.channel
+    else:
+        guild = guild or target.guild
+        channel = target.channel
+
+    if guild is None or channel is None:
+        raise RuntimeError(
+            "Não consegui identificar o servidor ou canal."
+        )
+
+    if spec is None and template_key:
+        spec = get_template(template_key)
+
+    if not spec:
+        raise RuntimeError("Não foi fornecida uma estrutura válida.")
+
+    status = await channel.send(
+        "⚔️ Preparando a construção do Slayer Bot..."
+    )
+
+    async def progress(text):
+        await status.edit(content=text)
+
+    try:
+        created = await builder.build_guild_structure(
+            guild,
+            spec,
+            progress=progress,
+            reset=reset,
+            preserve_channel_id=channel.id
+        )
+
+        wiped = created.get("wiped", {})
+
+        template_label = None
+        if template_key and template_key in TEMPLATES:
+            template_label = TEMPLATES[template_key]["label"]
+
+        embed = builder.summary_embed(
+            spec,
+            created,
+            template_label=template_label,
+            wiped=wiped if reset else None
+        )
+
+        await status.edit(
+            content=None,
+            embed=embed
+        )
+
+    except Exception as error:
+        print(f"[ERRO CONSTRUÇÃO] {error}")
+
+        await status.edit(
+            content=(
+                "❌ **Não consegui concluir a construção.**\n"
+                f"Motivo: `{str(error)[:1500]}`"
+            )
+        )
+
+
 
 def can_build(member: discord.Member) -> bool:
     """Verifica se o usuário pode criar estruturas."""
