@@ -51,12 +51,16 @@ async def run_build(
 
     if spec is None and template_key:
         spec = get_template(template_key)
-
-    if not spec:
-        raise RuntimeError("Não foi fornecida uma estrutura válida.")
-
-    status = await channel.send(
-        "⚔️ Preparando a construção do Slayer Bot..."
+if (
+    not isinstance(spec, dict)
+    or not isinstance(spec.get("roles"), list)
+    or not isinstance(spec.get("categories"), list)
+    or not spec.get("roles")
+    or not spec.get("categories")
+):
+    return await message.reply(
+        "❌ A estrutura gerada está incompleta. "
+        "Tente explicar melhor como deseja seu servidor."
     )
 
     async def progress(text):
