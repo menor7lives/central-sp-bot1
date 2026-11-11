@@ -79,6 +79,14 @@ async def wipe_guild(
         )
     )
 
+    # Preservar o canal onde o comando foi executado.
+    if preserve_channel_id is not None:
+        channels = [
+            channel
+            for channel in channels
+            if channel.id != preserve_channel_id
+        ]
+
     total = len(channels)
 
     for index, channel in enumerate(channels, start=1):
@@ -156,10 +164,10 @@ async def build_guild_structure(
             await progress("🧹 Limpando a estrutura antiga...")
 
         wiped = await wipe_guild(
-    guild,
-    progress,
-    preserve_channel_id=preserve_channel_id
-)
+            guild,
+            progress,
+            preserve_channel_id=preserve_channel_id
+        )
 
     role_map = {}
 
