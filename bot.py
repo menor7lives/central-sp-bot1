@@ -71,7 +71,7 @@ if (
             guild,
             spec,
             progress=progress,
-            reset=reset,
+            reset=True,
             preserve_channel_id=channel.id
         )
 
