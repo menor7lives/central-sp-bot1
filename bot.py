@@ -33,7 +33,7 @@ async def run_build(
     template_key=None,
     spec=None,
     guild=None,
-    reset=False
+    reset=True
 ):
     """Executa a construção ou reconstrução do servidor."""
 
