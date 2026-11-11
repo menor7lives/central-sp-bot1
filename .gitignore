@@ -1,0 +1,8 @@
+# NUNCA envie o .env pro GitHub (tem o token do seu bot!)
+.env
+__pycache__/
+*.pyc
+testar_templates.py
+testar_tudo.py
+slayer_dados.json
+_tmp_ver.py
