@@ -30,78 +30,133 @@ def _overwrites(spec, role_map, guild):
     return overwrites
 
 
-async def wipe_guild(guild):
-    """Remove canais, categorias e cargos não protegidos."""
+async def wipe_guild(guild, progress=None):
+    """Remove canais, categorias e cargos que o bot pode gerenciar."""
 
-    wiped = {"channels": 0, "roles": 0}
     bot_member = guild.me
 
     if bot_member is None:
         raise RuntimeError("Não consegui identificar o membro do bot.")
 
+    permissions = bot_member.guild_permissions
+
+    if not permissions.manage_channels:
+        raise RuntimeError(
+            "O bot precisa da permissão Gerenciar Canais."
+        )
+
+    if not permissions.manage_roles:
+        raise RuntimeError(
+            "O bot precisa da permissão Gerenciar Cargos."
+        )
+
     bot_top_role = bot_member.top_role
 
-    # 1. Apaga canais comuns antes das categorias.
-    channels = sorted(
-        list(guild.channels),
+    wiped = {
+        "channels": 0,
+        "categories": 0,
+        "roles": 0,
+        "failed": 0,
+    }
+
+    # 1. Apagar canais antes das categorias.
+    channels = [
+        *guild.text_channels,
+        *guild.voice_channels,
+        *guild.stage_channels,
+        *guild.forum_channels,
+        *guild.categories,
+    ]
+
+    # Categorias ficam por último.
+    channels.sort(
         key=lambda channel: isinstance(
             channel, discord.CategoryChannel
         )
     )
 
-    for channel in channels:
+    total = len(channels)
+
+    for index, channel in enumerate(channels, start=1):
         try:
-            await channel.delete(
-                reason="Slayer Bot — reconstrução do servidor"
+            is_category = isinstance(
+                channel, discord.CategoryChannel
             )
-            wiped["channels"] += 1
+
+            await channel.delete(
+                reason="Slayer Bot — reconstrução autorizada"
+            )
+
+            if is_category:
+                wiped["categories"] += 1
+            else:
+                wiped["channels"] += 1
+
         except (discord.Forbidden, discord.HTTPException) as error:
-            print(f"[RESET] Não foi possível apagar {channel.name}: {error}")
+            wiped["failed"] += 1
+            print(
+                f"[RESET] Erro ao apagar {channel.name}: {error}"
+            )
 
-    # 2. Apaga apenas cargos que podem ser gerenciados com segurança.
+        if progress and index % 5 == 0:
+            await progress(
+                f"🧹 Limpando servidor: {index}/{total} canais..."
+            )
+
+    # 2. Apagar cargos que estão abaixo da hierarquia do bot.
     for role in list(guild.roles):
-        if role.is_default():
+        if role.is_default() or role.managed:
             continue
 
-        if role.managed:
-            continue
-
-        if role.permissions.administrator:
-            continue
-
+        # Não remover o próprio cargo do bot nem cargos superiores.
         if role >= bot_top_role:
             continue
 
         try:
             await role.delete(
-                reason="Slayer Bot — reconstrução do servidor"
+                reason="Slayer Bot — reconstrução autorizada"
             )
             wiped["roles"] += 1
+
         except (discord.Forbidden, discord.HTTPException) as error:
-            print(f"[RESET] Não foi possível apagar {role.name}: {error}")
+            wiped["failed"] += 1
+            print(
+                f"[RESET] Erro ao apagar cargo {role.name}: {error}"
+            )
 
     return wiped
 
 
-async def build_guild_structure(guild, spec, progress=None, reset=False):
-    """Cria a estrutura do servidor, opcionalmente fazendo reset primeiro."""
+async def build_guild_structure(
+    guild,
+    spec,
+    progress=None,
+    reset=False
+):
+    """Cria a estrutura do servidor."""
 
-    wiped = {"channels": 0, "roles": 0}
+    wiped = {
+        "channels": 0,
+        "categories": 0,
+        "roles": 0,
+        "failed": 0,
+    }
 
     if reset:
         if progress:
             await progress("🧹 Limpando a estrutura antiga...")
 
-        wiped = await wipe_guild(guild)
+        wiped = await wipe_guild(guild, progress)
 
     role_map = {}
+
     created = {
         "roles": 0,
         "categories": 0,
         "channels": 0,
     }
 
-    # 1. Criação e configuração dos cargos.
+    # 1. Criação dos cargos.
     for role_data in spec.get("roles", []):
         role = discord.utils.get(
             guild.roles,
@@ -126,7 +181,7 @@ async def build_guild_structure(guild, spec, progress=None, reset=False):
             )
             created["roles"] += 1
 
-        elif not role.permissions.administrator:
+        elif not role.managed and role < guild.me.top_role:
             await role.edit(
                 permissions=permissions,
                 color=discord.Color(
@@ -166,55 +221,56 @@ async def build_guild_structure(guild, spec, progress=None, reset=False):
             name = channel_data["name"]
             channel_type = channel_data.get("type", "text")
 
-            channel = discord.utils.get(
-                guild.channels,
-                name=name
-            )
-
             channel_overwrites = _overwrites(
                 channel_data.get("overwrites"),
                 role_map,
                 guild
             )
 
-            if channel is not None:
-                if channel_type == "voice" and isinstance(
-                    channel, discord.VoiceChannel
-                ):
-                    await channel.edit(
-                        category=category,
-                        overwrites=channel_overwrites
-                    )
-                elif channel_type != "voice" and isinstance(
-                    channel, discord.TextChannel
-                ):
-                    await channel.edit(
-                        category=category,
-                        overwrites=channel_overwrites
-                    )
-                continue
-
             if channel_type == "voice":
-                await guild.create_voice_channel(
-                    name,
-                    category=category,
-                    overwrites=channel_overwrites,
-                    user_limit=channel_data.get("user_limit"),
-                    reason="Slayer Bot — criação automática",
-                )
-            else:
-                await guild.create_text_channel(
-                    name,
-                    category=category,
-                    overwrites=channel_overwrites,
-                    reason="Slayer Bot — criação automática",
+                channel = discord.utils.get(
+                    guild.voice_channels,
+                    name=name
                 )
 
-            created["channels"] += 1
+                if channel is None:
+                    await guild.create_voice_channel(
+                        name,
+                        category=category,
+                        overwrites=channel_overwrites,
+                        user_limit=channel_data.get("user_limit"),
+                        reason="Slayer Bot — criação automática",
+                    )
+                    created["channels"] += 1
+                else:
+                    await channel.edit(
+                        category=category,
+                        overwrites=channel_overwrites
+                    )
+
+            else:
+                channel = discord.utils.get(
+                    guild.text_channels,
+                    name=name
+                )
+
+                if channel is None:
+                    await guild.create_text_channel(
+                        name,
+                        category=category,
+                        overwrites=channel_overwrites,
+                        reason="Slayer Bot — criação automática",
+                    )
+                    created["channels"] += 1
+                else:
+                    await channel.edit(
+                        category=category,
+                        overwrites=channel_overwrites
+                    )
 
         if progress:
             await progress(
-                f"✅ Categoria **{category_data['name']}** criada."
+                f"✅ Categoria **{category_data['name']}** configurada."
             )
 
     created["wiped"] = wiped
@@ -223,7 +279,7 @@ async def build_guild_structure(guild, spec, progress=None, reset=False):
 
 def summary_embed(spec, created, template_label=None, wiped=None):
     embed = discord.Embed(
-        title="✅ Servidor reconstruído!",
+        title="⚔️ Slayer Bot — Servidor configurado!",
         description=(
             f"**{spec.get('name', 'Servidor')}**"
             + (
@@ -231,15 +287,17 @@ def summary_embed(spec, created, template_label=None, wiped=None):
                 if template_label else ""
             )
         ),
-        color=0x2ECC71,
+        color=0x9B59B6,
     )
 
     if wiped:
         embed.add_field(
             name="🧹 Estrutura removida",
             value=(
-                f"{wiped['channels']} canais/categorias\n"
-                f"{wiped['roles']} cargos"
+                f"📺 Canais: {wiped['channels']}\n"
+                f"📁 Categorias: {wiped['categories']}\n"
+                f"👤 Cargos: {wiped['roles']}\n"
+                f"⚠️ Falhas: {wiped['failed']}"
             ),
             inline=False,
         )
@@ -248,14 +306,19 @@ def summary_embed(spec, created, template_label=None, wiped=None):
         name="👤 Cargos criados",
         value=str(created["roles"])
     )
+
     embed.add_field(
         name="📁 Categorias criadas",
         value=str(created["categories"])
     )
+
     embed.add_field(
         name="📺 Canais criados",
         value=str(created["channels"])
     )
 
-    embed.set_footer(text="Slayer Bot • reconstrução automática")
+    embed.set_footer(
+        text="Slayer Bot Premium • Reconstrução automática"
+    )
+
     return embed
