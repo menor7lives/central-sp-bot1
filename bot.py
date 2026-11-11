@@ -844,10 +844,10 @@ async def handle_mention(message: discord.Message):
                 "comunidade"
             )
 
-            spec = (
-                get_template(template_key)
-                or intent.get("spec")
-            )
+if template_key == "custom":
+    spec = intent.get("spec")
+else:
+    spec = get_template(template_key) or intent.get("spec")
 
             if not spec:
                 return await message.reply(
