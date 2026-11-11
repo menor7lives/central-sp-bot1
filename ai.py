@@ -173,17 +173,118 @@ BLOCKED_REPLY = (
 )
 
 
+
 async def get_intent(message_text: str, author: str) -> dict:
-    """Retorna {"action": "chat"|"build_server", ...}."""
+    """Retorna uma intenção validada para o Slayer Bot."""
+
     if _is_blocked(message_text):
-        return {"action": "chat", "reply": BLOCKED_REPLY}
+        return {
+            "action": "chat",
+            "reply": BLOCKED_REPLY,
+        }
+
     if config.AI_API_KEY:
         result = await _ask_ai(message_text, author)
-        if result:
-            if _is_blocked(str(result)):
-                return {"action": "chat", "reply": BLOCKED_REPLY}
-            return result
+
+        if isinstance(result, dict):
+            action = result.get("action")
+
+            if action == "chat":
+                reply = result.get("reply")
+
+                if isinstance(reply, str) and reply.strip():
+                    if _is_blocked(reply):
+                        return {
+                            "action": "chat",
+                            "reply": BLOCKED_REPLY,
+                        }
+
+                    return {
+                        "action": "chat",
+                        "reply": reply[:2000],
+                    }
+
+            elif action == "build_server":
+                template = result.get("template")
+
+                if not isinstance(template, str):
+                    template = ""
+
+                if template == "custom":
+                    spec = result.get("spec")
+
+                    if isinstance(spec, dict):
+                        roles = spec.get("roles")
+                        categories = spec.get("categories")
+
+                        valid_spec = (
+                            isinstance(spec.get("name"), str)
+                            and bool(spec["name"].strip())
+                            and isinstance(roles, list)
+                            and isinstance(categories, list)
+                            and 1 <= len(roles) <= 30
+                            and 1 <= len(categories) <= 20
+                        )
+
+                        if valid_spec:
+                            for role in roles:
+                                if (
+                                    not isinstance(role, dict)
+                                    or not isinstance(role.get("name"), str)
+                                    or not role["name"].strip()
+                                    or not isinstance(
+                                        role.get("permissions", []), list
+                                    )
+                                ):
+                                    valid_spec = False
+                                    break
+
+                        if valid_spec:
+                            for category in categories:
+                                if (
+                                    not isinstance(category, dict)
+                                    or not isinstance(category.get("name"), str)
+                                    or not category["name"].strip()
+                                    or not isinstance(
+                                        category.get("channels"), list
+                                    )
+                                ):
+                                    valid_spec = False
+                                    break
+
+                                for channel in category["channels"]:
+                                    if (
+                                        not isinstance(channel, dict)
+                                        or not isinstance(channel.get("name"), str)
+                                        or not channel["name"].strip()
+                                        or channel.get("type", "text")
+                                        not in ("text", "voice")
+                                    ):
+                                        valid_spec = False
+                                        break
+
+                                if not valid_spec:
+                                    break
+
+                        if valid_spec:
+                            return {
+                                "action": "build_server",
+                                "template": "custom",
+                                "guild_name": str(
+                                    result.get("guild_name")
+                                    or spec["name"]
+                                )[:100],
+                                "spec": spec,
+                            }
+
+                elif any(template == key for _, key in KEYWORD_MAP):
+                    return {
+                        "action": "build_server",
+                        "template": template,
+                    }
+
     return _fallback(message_text)
+
 
 
 async def _chat(mensagens) -> str | None:
