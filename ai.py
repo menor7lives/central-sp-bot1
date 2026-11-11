@@ -3,132 +3,48 @@ import json
 import config
 import dados
 
+SYSTEM_PROMPT = """Você é o bot "Slayer Bot" em um servidor do Discord.
+Responda SEMPRE em português brasileiro, direto e amigável.
 
-SYSTEM_PROMPT = """Você é o cérebro inteligente do Slayer Bot, especialista em criar servidores Discord completos, profissionais e personalizados.
+Você deve responder SOMENTE com um JSON válido, em um destes formatos:
 
-Responda sempre em português brasileiro.
-Retorne SOMENTE JSON válido. Nunca escreva explicações fora do JSON.
+1. Se o usuário pedir para criar/montar/configurar um servidor (com canais, cargos,
+   categorias e permissões), use um template pronto quando encaixar:
+{"action": "build_server", "template": "futebol", "guild_name": "nome escolhido"}
 
-MISSÃO:
-Criar servidores de qualquer segmento solicitado pelo usuário. Não fique limitado aos templates existentes. Analise cada pedido e gere uma estrutura personalizada.
+Templates disponíveis: "futebol" (clube profissional), "comunidade", "gaming",
+"fivem" (cidade RP FiveM), "mta" (servidor MTA SA de GTA), "loja" (e-commerce),
+"empresa" (corporação), "studio" (estúdio musical), "cla" (clã de e-sports),
+"minecraft", "youtube" (criadores de conteúdo), "anime" (otaku),
+"estudos" (escola/faculdade), "suporte" (atendimento técnico),
+"design" (agência criativa), "podcast", "eventos".
 
-TIPOS DE SERVIDORES QUE VOCÊ DEVE SABER CRIAR:
+2. Se ele pedir algo que não encaixa em nenhum template, gere um spec customizado:
+{"action": "build_server", "template": "custom", "guild_name": "nome", "spec": {
+  "name": "nome do servidor",
+  "roles": [{"name": "Cargo", "color": 3447003, "permissions": ["manage_messages"], "hoist": true}],
+  "categories": [{"name": "CATEGORIA", "channels": [
+      {"name": "canal-texto", "type": "text", "overwrites": {"@everyone": {"allow": ["view_channel"], "deny": ["send_messages"]}}},
+      {"name": "Canal de Voz", "type": "voice"}]}]}}
 
-1. SEGURANÇA PÚBLICA:
-Polícia Militar, Polícia Civil, Polícia Federal, Guarda Municipal, Polícia Rodoviária, Polícia Penal e organizações fictícias de segurança.
+REGRAS DE PERMISSÕES:
+Nunca conceda estas permissões aos cargos gerados:
+administrator, manage_guild, manage_channels, manage_roles.
 
-2. FORÇAS ARMADAS:
-Exército, Marinha, Aeronáutica, forças especiais e organizações militares fictícias.
-
-3. EMERGÊNCIA E SAÚDE:
-Corpo de Bombeiros, SAMU, hospitais, clínicas, resgate e defesa civil.
-
-4. ROLEPLAY:
-GTA RP, FiveM, MTA, departamentos policiais, hospitais, oficinas, concessionárias, facções fictícias e organizações de RP.
-
-5. EMPRESAS:
-Empresas privadas, lojas, concessionárias, oficinas, transportadoras, restaurantes, agências e corporações comerciais.
-
-6. OUTRAS ORGANIZAÇÕES:
-Escolas, faculdades, equipes de e-sports, estúdios, comunidades, agências, clubes e qualquer outro segmento solicitado.
-
-FORMATO OBRIGATÓRIO PARA CRIAR SERVIDORES:
-
-{
-  "action": "build_server",
-  "template": "custom",
-  "guild_name": "Nome do servidor",
-  "spec": {
-    "name": "Nome do servidor",
-    "roles": [
-      {
-        "name": "Fundador",
-        "color": 16766720,
-        "permissions": ["manage_guild"],
-        "hoist": true
-      },
-      {
-        "name": "Administrador",
-        "color": 15158332,
-        "permissions": ["manage_channels", "manage_messages"],
-        "hoist": true
-      },
-      {
-        "name": "Membro",
-        "color": 3447003,
-        "permissions": [],
-        "hoist": false
-      }
-    ],
-    "categories": [
-      {
-        "name": "INFORMAÇÕES",
-        "overwrites": {
-          "@everyone": {
-            "allow": ["view_channel"],
-            "deny": ["send_messages"]
-          }
-        },
-        "channels": [
-          {"name": "avisos", "type": "text"},
-          {"name": "regras", "type": "text"}
-        ]
-      },
-      {
-        "name": "GERAL",
-        "channels": [
-          {"name": "chat-geral", "type": "text"},
-          {"name": "Sala Geral", "type": "voice"}
-        ]
-      }
-    ]
-  }
-}
-
-REGRAS PARA CRIAR UMA CORPORAÇÃO:
-
-- Criar uma hierarquia coerente, do maior ao menor.
-- Criar cargos específicos para o segmento solicitado.
-- Criar departamentos e setores adequados à organização.
-- Criar canais de comunicação, avisos, documentação e relatórios.
-- Criar setores de recrutamento, treinamento e atendimento quando necessários.
-- Criar canais privados para departamentos restritos.
-- Configurar permissões por cargo.
-- Criar canais de voz para reuniões e operações quando necessário.
-- Utilizar nomes profissionais e organização visual.
-- Criar normalmente entre 8 e 15 cargos e entre 5 e 14 categorias, conforme o tamanho solicitado.
-- Não criar cargos ou canais duplicados.
-- Não conceder administrator indiscriminadamente.
-- Nunca conceder permissões perigosas sem necessidade.
-- Não inventar funcionalidades que o código não implementou.
-
-REGRAS TÉCNICAS:
-
-Tipos de canais permitidos:
-"text" e "voice".
-
-Permissões permitidas:
-administrator, manage_guild, manage_channels, manage_roles,
+Permissões comuns permitidas:
 manage_messages, kick_members, ban_members, view_channel,
-send_messages, attach_files, add_reactions, mention_everyone,
-connect, speak, moderate_members.
+send_messages, attach_files, add_reactions, connect, speak,
+moderate_members.
 
-IMPORTANTE:
-- Quando o usuário pedir uma corporação específica, crie uma estrutura própria para ela.
-- Não transforme automaticamente toda corporação em uma empresa genérica.
-- Não dependa de modelos fixos.
-- Se o usuário pedir uma estrutura simples, não exagere.
-- Se pedir uma estrutura completa ou profissional, entregue uma estrutura detalhada.
-- Respeite o nome e as características solicitadas pelo usuário.
-- O JSON deve conter roles e categories completos.
-- Cada canal deve ter name e type.
+Cargos hierárquicos representam patente e autoridade interna,
+não devem receber automaticamente permissões administrativas do Discord.
+Nunca conceda permissões perigosas apenas porque o cargo tem nome de comandante,
+diretor, dono, presidente ou administrador.
 
-SE O USUÁRIO QUISER APENAS CONVERSAR:
-Retorne:
-{"action": "chat", "reply": "Sua resposta em português brasileiro"}
+3. Se for só conversa, pergunta ou outro pedido:
+{"action": "chat", "reply": "sua resposta"}
 
 Nunca inclua texto fora do JSON."""
-
 
 KEYWORD_MAP = [
     (("futebol", "clube", "time de futebol", "soccer"), "futebol"),
@@ -173,118 +89,17 @@ BLOCKED_REPLY = (
 )
 
 
-
 async def get_intent(message_text: str, author: str) -> dict:
-    """Retorna uma intenção validada para o Slayer Bot."""
-
+    """Retorna {"action": "chat"|"build_server", ...}."""
     if _is_blocked(message_text):
-        return {
-            "action": "chat",
-            "reply": BLOCKED_REPLY,
-        }
-
+        return {"action": "chat", "reply": BLOCKED_REPLY}
     if config.AI_API_KEY:
         result = await _ask_ai(message_text, author)
-
-        if isinstance(result, dict):
-            action = result.get("action")
-
-            if action == "chat":
-                reply = result.get("reply")
-
-                if isinstance(reply, str) and reply.strip():
-                    if _is_blocked(reply):
-                        return {
-                            "action": "chat",
-                            "reply": BLOCKED_REPLY,
-                        }
-
-                    return {
-                        "action": "chat",
-                        "reply": reply[:2000],
-                    }
-
-            elif action == "build_server":
-                template = result.get("template")
-
-                if not isinstance(template, str):
-                    template = ""
-
-                if template == "custom":
-                    spec = result.get("spec")
-
-                    if isinstance(spec, dict):
-                        roles = spec.get("roles")
-                        categories = spec.get("categories")
-
-                        valid_spec = (
-                            isinstance(spec.get("name"), str)
-                            and bool(spec["name"].strip())
-                            and isinstance(roles, list)
-                            and isinstance(categories, list)
-                            and 1 <= len(roles) <= 30
-                            and 1 <= len(categories) <= 20
-                        )
-
-                        if valid_spec:
-                            for role in roles:
-                                if (
-                                    not isinstance(role, dict)
-                                    or not isinstance(role.get("name"), str)
-                                    or not role["name"].strip()
-                                    or not isinstance(
-                                        role.get("permissions", []), list
-                                    )
-                                ):
-                                    valid_spec = False
-                                    break
-
-                        if valid_spec:
-                            for category in categories:
-                                if (
-                                    not isinstance(category, dict)
-                                    or not isinstance(category.get("name"), str)
-                                    or not category["name"].strip()
-                                    or not isinstance(
-                                        category.get("channels"), list
-                                    )
-                                ):
-                                    valid_spec = False
-                                    break
-
-                                for channel in category["channels"]:
-                                    if (
-                                        not isinstance(channel, dict)
-                                        or not isinstance(channel.get("name"), str)
-                                        or not channel["name"].strip()
-                                        or channel.get("type", "text")
-                                        not in ("text", "voice")
-                                    ):
-                                        valid_spec = False
-                                        break
-
-                                if not valid_spec:
-                                    break
-
-                        if valid_spec:
-                            return {
-                                "action": "build_server",
-                                "template": "custom",
-                                "guild_name": str(
-                                    result.get("guild_name")
-                                    or spec["name"]
-                                )[:100],
-                                "spec": spec,
-                            }
-
-                elif any(template == key for _, key in KEYWORD_MAP):
-                    return {
-                        "action": "build_server",
-                        "template": template,
-                    }
-
+        if result:
+            if _is_blocked(str(result)):
+                return {"action": "chat", "reply": BLOCKED_REPLY}
+            return result
     return _fallback(message_text)
-
 
 
 async def _chat(mensagens) -> str | None:
@@ -334,141 +149,27 @@ BUILD_VERBS = ("criar", "crie", "montar", "monte", "cria", "configurar", "config
                "monta", "faz", "faça", "faca", "quero", "preciso", "montagem", "setar")
 
 
-
 def _fallback(text: str) -> dict:
     t = text.lower()
-
-    wants_build = any(w in t for w in BUILD_VERBS) or any(
-        word in t for word in ("servidor", "corporação", "corporacao", "organização", "organizacao")
-    )
-
-    if not wants_build:
-        return {
-            "action": "chat",
-            "reply": (
-                "🤖 Me mencione e diga o que deseja criar! "
-                "Posso ajudar a montar servidores, cargos, categorias e canais."
-            ),
-        }
-
-    # Organizações que precisam de uma estrutura personalizada.
-    organizations = [
-        (
-            ("polícia militar", "policia militar", "pm", "polícia civil",
-             "policia civil", "polícia federal", "policia federal",
-             "delegacia", "policia", "polícia"),
-            "Polícia",
-            ["Comandante Geral", "Subcomandante", "Coronel", "Major",
-             "Capitão", "Tenente", "Sargento", "Cabo", "Soldado",
-             "Recruta"],
-            ["COMANDO", "OFICIAIS", "OPERAÇÕES", "RECRUTAMENTO",
-             "COMUNICAÇÃO", "INFORMAÇÕES"],
-        ),
-        (
-            ("exército", "exercito", "marinha", "aeronáutica",
-             "aeronautica", "forças armadas", "forcas armadas"),
-            "Forças Armadas",
-            ["Comandante", "General", "Coronel", "Major", "Capitão",
-             "Tenente", "Sargento", "Cabo", "Soldado", "Recruta"],
-            ["ALTO COMANDO", "OFICIAIS", "OPERAÇÕES", "TREINAMENTO",
-             "RECRUTAMENTO", "COMUNICAÇÃO"],
-        ),
-        (
-            ("bombeiros", "corpo de bombeiros", "sam u", "samu",
-             "hospital", "hospitalar", "ambulância", "ambulancia"),
-            "Emergência e Saúde",
-            ["Diretor", "Coordenador", "Supervisor", "Médico",
-             "Enfermeiro", "Socorrista", "Paramédico", "Estagiário"],
-            ["DIREÇÃO", "ATENDIMENTO", "EMERGÊNCIAS", "EQUIPE MÉDICA",
-             "TREINAMENTO", "COMUNICAÇÃO"],
-        ),
-        (
-            ("concessionária", "concessionaria", "oficina", "mecânica",
-             "mecanica", "empresa", "corporação", "corporacao",
-             "loja", "transportadora"),
-            "Empresa",
-            ["Diretor Executivo", "Gerente", "Supervisor",
-             "Coordenador", "Funcionário", "Estagiário"],
-            ["DIRETORIA", "ADMINISTRAÇÃO", "DEPARTAMENTOS",
-             "FUNCIONÁRIOS", "ATENDIMENTO", "COMUNICAÇÃO"],
-        ),
-        (
-            ("escola", "faculdade", "universidade", "colégio", "colegio"),
-            "Instituição de Ensino",
-            ["Diretor", "Vice-Diretor", "Coordenador", "Professor",
-             "Monitor", "Aluno"],
-            ["DIREÇÃO", "PROFESSORES", "SALAS DE AULA",
-             "ALUNOS", "AVISOS", "COMUNICAÇÃO"],
-        ),
-    ]
-
-    for keywords, name, role_names, category_names in organizations:
-        if any(word in t for word in keywords):
-            roles = [
-                {
-                    "name": role,
-                    "color": 3447003,
-                    "permissions": [],
-                    "hoist": True,
-                }
-                for role in role_names
-            ]
-
-            categories = []
-
-            for category in category_names:
-                categories.append({
-                    "name": category,
-                    "channels": [
-                        {
-                            "name": "geral",
-                            "type": "text",
-                        },
-                        {
-                            "name": "comunicados",
-                            "type": "text",
-                        },
-                        {
-                            "name": "reuniao",
-                            "type": "voice",
-                        },
-                    ],
-                })
-
-            return {
-                "action": "build_server",
-                "template": "custom",
-                "guild_name": name,
-                "spec": {
-                    "name": name,
-                    "roles": roles,
-                    "categories": categories,
-                },
-            }
-
-    # Mantém os templates que já existiam.
-    for words, template in KEYWORD_MAP:
-        if any(word in t for word in words):
-            return {
-                "action": "build_server",
-                "template": template,
-            }
-
-    if "servidor" in t:
-        return {
-            "action": "build_server",
-            "template": "comunidade",
-        }
-
+    mentions_template = any(any(w in t for w in words) for words, _ in KEYWORD_MAP)
+    wants_build = any(w in t for w in BUILD_VERBS) or "servidor" in t
+    if mentions_template and wants_build:
+        for words, template in KEYWORD_MAP:
+            if any(w in t for w in words):
+                return {"action": "build_server", "template": template}
+    if any(w in t for w in BUILD_VERBS) and "servidor" in t:
+        return {"action": "build_server", "template": "comunidade"}
     return {
         "action": "chat",
         "reply": (
-            "🤖 Me mencione e diga o que deseja criar!\n"
-            "Posso montar servidores de jogos, empresas, organizações "
-            "e muito mais. 😉"
+            "🤖 **Consigo fazer tudo por aqui!** Me mencione e peça, por exemplo:\n"
+            "> `@Slayer BOT crie um servidor profissional de futebol`\n"
+            "> `@Slayer BOT monte um servidor de minecraft`\n"
+            "> `@Slayer BOT painel` — abre o painel completo\n"
+            "> `@Slayer BOT premium` — personalização exclusiva\n"
+            "Ou só converse comigo à vontade! 😉"
         ),
     }
-
 
 
 # ---------------- conversa com memória + personalidade ----------------
