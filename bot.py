@@ -209,12 +209,12 @@ class BuildModeView(discord.ui.View):
             view=None
         )
 
-        await run_build(
-            interaction,
-            template_key=self.template_key,
-            spec=self.spec,
-            reset=False
-        )
+await run_build(
+    interaction,
+    template_key=self.template_key,
+    spec=self.spec,
+    reset=True
+)
 
 
     @discord.ui.button(
